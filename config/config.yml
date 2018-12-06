@@ -1,0 +1,50 @@
+###########################
+#定义IP地址
+###########################
+local_ip: 127.0.0.1
+remote_ip: 127.0.0.1
+############################
+#log日志定义
+############################
+master_log:
+  say_hello: "/tmp/master_say_hello.log"
+  process_hash_info: "/tmp/process_hash_info.log"
+  check_hash_info: "/tmp/check_hash_info.log"
+slave_log:
+  say_hello: "/tmp/slave_say_hello.log"
+############################
+# 告警邮件定义
+############################
+email_send: on
+alert_email: "734300535@qq.com"
+
+
+###########################
+# 定义vip(可以飘移)
+###########################
+vip: 192.168.137.88
+
+###########################
+#  消息接收API
+###########################
+url_send: on
+url: 'http://192.168.137.37:8888/oneword/postdata/'
+rel_user: 'admin&wxl'
+############################
+#   延迟设定,注意这里必须是整数
+############################
+#初始尝试互联重试延迟
+init_connect_delay: 1
+#发送hello消息延迟
+say_hello_delay: 1
+#发送say_hello失败重试的次数
+say_hello_fails_retry: 2
+#发送hello消息后，等待对方回应的最长时间
+say_hello_max_timeout: 3
+#进程状态hash表check延迟
+hash_table_check: 1
+#认定程序超时报道的延迟阀值
+process_max_timeout: 30
+
+
+
