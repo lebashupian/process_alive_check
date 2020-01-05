@@ -13,8 +13,9 @@ def 线程发送hello(*参数)
 	线程数组 << Thread.new {
 		loop {
 			begin
-				发送 = TCPSocket.new 远端IP, 远端端口
-				发送.puts("#{本地IP}-----#{$PROGRAM_NAME}-----#{Process.pid}");
+				p 远端IP
+				p 远端端口
+				UDPSocket.new.send("#{本地IP}-----#{$PROGRAM_NAME}-----#{Process.pid}",0,远端IP,远端端口);
 				sleep 5
 			rescue
 				puts "重连并发送..."

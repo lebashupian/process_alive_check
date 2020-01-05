@@ -15,15 +15,26 @@ slave_log:
 ############################
 # 告警邮件定义
 ############################
-email_send: on
-alert_email: "734300535@qq.com"
+email_send: off
+alert_email: ""
 
 
 ###########################
 # 定义vip(可以飘移)
 ###########################
-vip: 192.168.137.88
+vip: 192.168.137.84
+vip_netmask: 24
+vip_dev: "eth0"
+###########################
+# 定义hash数据同步IP
+###########################
+data_local_ip: 192.168.137.37
+data_local_port: 18003
 
+data_remote_ip: 192.168.137.38
+data_remote_port: 18003
+
+data_sync_delay: 1
 ###########################
 #  消息接收API
 ###########################
@@ -36,7 +47,9 @@ rel_user: 'admin&wxl'
 #初始尝试互联重试延迟
 init_connect_delay: 1
 #发送hello消息延迟
-say_hello_delay: 1
+say_hello_delay: 0.01
+#包发送检查延迟
+packet_send_check_delay: 10
 #发送say_hello失败重试的次数
 say_hello_fails_retry: 2
 #发送hello消息后，等待对方回应的最长时间

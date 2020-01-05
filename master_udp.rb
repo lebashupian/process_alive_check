@@ -11,39 +11,56 @@ begin
 	require 'net/http'
 	require 'uri'
 	require 'json'
-
+	require "zlib"
 ## 是否已经发生报警
 	有过报警=false
-########### 使用配置文件
+########### 使用$配置文件
 	YAML_FILE             ="#{__dir__}/config/config.yml"
-	配置文件               =YAML.load(File.open(YAML_FILE,'r'));
+	$配置文件               =YAML.load(File.open(YAML_FILE,'r'));
 
-	say_hello_log         = 配置文件["master_log"]["say_hello"]
-	process_hash_info_log = 配置文件["master_log"]["process_hash_info"]
-	check_hash_info_log = 配置文件["master_log"]["check_hash_info"]
+	say_hello_log         = $配置文件["master_log"]["say_hello"]
+	process_hash_info_log = $配置文件["master_log"]["process_hash_info"]
+	check_hash_info_log = $配置文件["master_log"]["check_hash_info"]
 
-	$告警邮件地址           = 配置文件["alert_email"]
-	send_mail_switch    = 配置文件["email_send"]
+	$告警邮件地址           = $配置文件["alert_email"]
+	send_mail_switch    = $配置文件["email_send"]
 
-	say_hello延迟         = 配置文件["say_hello_delay"].to_i
-	say_hello_重试次数    = 配置文件["say_hello_fails_retry"].to_i
-	say_hello_最大超时    = 配置文件["say_hello_max_timeout"].to_i
-	hash表检查延迟        = 配置文件["hash_table_check"].to_i
+	包发送检查延迟         = $配置文件["packet_send_check_delay"].to_i
 
-	本地IP                = 配置文件["local_ip"]
-	远端IP                = 配置文件["remote_ip"]
-	程序最长超时时间       = 配置文件["process_max_timeout"].to_i
+	say_hello延迟         = $配置文件["say_hello_delay"].to_f
+	say_hello_重试次数    = $配置文件["say_hello_fails_retry"].to_i
+	say_hello_最大超时    = $配置文件["say_hello_max_timeout"].to_i
+	hash表检查延迟        = $配置文件["hash_table_check"].to_i
 
-	web_api_url          = 配置文件["url"]
-	web_api_switch       = 配置文件["url_send"]
-	web_api_rel_user     = 配置文件["rel_user"]
+
+	本地IP                = $配置文件["local_ip"]
+	远端IP                = $配置文件["remote_ip"]
+	程序最长超时时间       = $配置文件["process_max_timeout"].to_i
+
+	同步数据本地IP            = $配置文件["data_local_ip"] 
+	同步数据本地端口            = $配置文件["data_local_port"] 
+	同步数据远端IP            = $配置文件["data_remote_ip"] 
+	同步数据远端端口            = $配置文件["data_remote_port"]
+	同步数据延迟                = $配置文件["data_sync_delay"].to_f
+
+	web_api_url          = $配置文件["url"]
+	web_api_switch       = $配置文件["url_send"]
+	web_api_rel_user     = $配置文件["rel_user"]
+
+
+	角色='null' 
+
+
 
 ########### 日志记录
 	say_hello_log = File.new(say_hello_log,  "a+")
 	process_hash_info_log = File.new(process_hash_info_log,  "a+")
 	check_hash_info_log = File.new(check_hash_info_log,  "a+")
 ############
+	
 
+
+	
 	本地IP=本地IP
 	本地端口=18000
 	对端IP=远端IP
@@ -52,12 +69,20 @@ begin
 
 	接受消息IP=本地IP
 	接受消息端口=18002
-	消息接受器 = TCPServer.open(接受消息IP,接受消息端口)
 
+
+
+
+	udp接受消息=UDPSocket.new
+	udp接受消息.bind 接受消息IP , 接受消息端口
+
+	udp同步=UDPSocket.new
+	udp同步.bind 同步数据本地IP,同步数据本地端口
 
 	##################
 	# 报警函数
 	def send_alert_email
+		puts "发送报警邮件"
 		Net::SMTP.start('127.0.0.1', 25) do |smtp|
 			smtp.open_message_stream('process@ruby', [$告警邮件地址]) do |f|
 				f.puts '=?utf-8?B?Subject: 服务告警?='
@@ -66,7 +91,27 @@ begin
 				f.puts '所在主机：37'
 			end
 		end
+		puts "发送完毕"
 	end
+
+	def 删除vip
+		虚拟ip=$配置文件["vip"]
+		虚拟netmask=$配置文件["vip_netmask"]
+		虚拟ip_dev=$配置文件["vip_dev"]
+		`ip addr del "#{虚拟ip}"/"#{虚拟netmask}" dev "#{虚拟ip_dev}"`		
+	end
+
+	def 添加vip
+		删除vip
+		虚拟ip=$配置文件["vip"]
+		虚拟netmask=$配置文件["vip_netmask"]
+		虚拟ip_dev=$配置文件["vip_dev"]
+		`ip addr add "#{虚拟ip}"/"#{虚拟netmask}" dev "#{虚拟ip_dev}"`
+	end
+
+	#添加vip
+
+
 
 	udp对象 = UDPSocket.new
 	udp对象.bind 本地IP,本地端口
@@ -80,7 +125,7 @@ begin
 				abc = udp对象.recvfrom(1000)
 
 				#正常情况下，每次重置一下变量
-				say_hello_重试次数 = 配置文件["say_hello_fails_retry"].to_i
+				say_hello_重试次数 = $配置文件["say_hello_fails_retry"].to_i
 				有过报警=false
 				
 				abc = abc[0].to_i
@@ -96,7 +141,7 @@ begin
 				#puts "发送 #{udp_hello_data["接力数字"]}"	
 				say_hello_log.syswrite("发送 #{udp_hello_data["接力数字"]}\n")
 				udp对象.send "#{udp_hello_data["接力数字"]}" ,0, 对端IP ,对端端口			
-				sleep 0.1
+				sleep say_hello延迟
 			rescue Exception => e
 	  			puts e.message
 				retry 
@@ -106,7 +151,7 @@ begin
 
 	线程list << Thread.new {
 		loop {
-			sleep say_hello延迟
+			sleep 包发送检查延迟
 			落后时差 = Time.new - udp_hello_data["接力超时"]
 			if 落后时差 > say_hello_最大超时 and say_hello_重试次数 > 0
 				sleep say_hello_最大超时
@@ -117,34 +162,52 @@ begin
 			elsif 落后时差 > say_hello_最大超时 and say_hello_重试次数 <= 0
 				#puts "重试完全失败"
 				say_hello_log.syswrite("重试完全失败\n")
+
+				添加vip
+				say_hello_log.syswrite("添加vip\n")
+
 				if send_mail_switch and ! 有过报警
 					send_alert_email
 					有过报警=true
 				end
-				udp对象.send "#{udp_hello_data["接力数字"]}" ,0, 对端IP ,对端端口
+				#udp对象.send "#{udp_hello_data["接力数字"]}" ,0, 对端IP ,对端端口
 			end
 		}
 	}
+
+
 
 	##########################
 	# 接受进程信息，更新hash表
 	##########################
 
-	hello_table=Hash.new
+	消息表=Hash.new
 	线程list << Thread.new {
-	  	loop {
-		    Thread.start(消息接受器.accept) { |client|
-		        hello_msg=client.gets.chomp
-		        process_hash_info_log.syswrite("接受到#{hello_msg}\n")
-		        hello_array=hello_msg.split(/-----/)
-		        hello_ip      = hello_array[0]
-		        hello_program = hello_array[1]
-		        hello_pid     = hello_array[2]
-		        hello_time    = Time.new
-		        hello_table["#{hello_ip}-#{hello_program}-#{hello_pid}"]=hello_time
-		        process_hash_info_log.syswrite("hash表:#{hello_table}\n")
-		        client.close
-		    }
+		loop {
+			进程消息 = udp接受消息.recvfrom(2048)
+			进程消息 = 进程消息[0].chomp
+			process_hash_info_log.syswrite("接受到#{进程消息}\n")
+	        消息数组=进程消息.split(/-----/)
+	        消息_ip      = 消息数组[0]
+	        消息_程序     = 消息数组[1]
+	        消息_pid     = 消息数组[2]
+	        消息时间    = Time.new
+	        消息表["#{消息_ip}-#{消息_程序}-#{消息_pid}"]=消息时间
+
+
+
+	        process_hash_info_log.syswrite("hash表:#{消息表}\n")
+		}
+	}
+
+	线程list << Thread.new {
+		loop {
+			if 角色 == 'master'
+	        	json数据=JSON.generate(消息表)
+	        	json压缩数据 = Zlib::Deflate.deflate(json数据)
+				udp同步.send json压缩数据 ,0, 对端IP ,对端端口
+			end
+				sleep 同步数据延迟
 		}
 	}
 
